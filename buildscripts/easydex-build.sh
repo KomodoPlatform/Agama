@@ -9,8 +9,8 @@ echo "Building EasyDEX-GUI"
 echo "Actual directory is: ${PWD}"
 
 echo "Checkout to redux branch."
-git checkout electrum
-git pull origin electrum
+git checkout v0.25
+git pull origin v0.25
 
 [ -d react ] && cd react || echo "!!! I can't find react"
 echo "Actual directory is: ${PWD}"
