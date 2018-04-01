@@ -1,4 +1,5 @@
 const nativeCoind = {
+  // TODO Our coin goes into this list, along with the binary module and port
   'btc': {
     name: 'Bitcoin',
     bin: 'bitcoin',

@@ -64,7 +64,7 @@ module.exports = (shepherd) => {
     const defaultCoinsListFile = path.join(__dirname, '../dex/coins.json');
     const _coins = fs.readJsonSync(defaultCoinsListFile, { throws: false });
     let coins = {};
-
+    // TODO Mostly from coins.json with a few hard wired, I assume we add to coins.json
     for (let i = 0; i < _coins.length; i++) {
       coins[_coins[i].coin] = _coins[i];
     }

@@ -1,7 +1,7 @@
 {
   "name": "agama-app",
   "productName": "Agama",
-  "version": "0.2.29",
+  "version": "0.2.30",
   "description": "Agama Wallet Desktop App",
   "main": "main.js",
   "scripts": {
@@ -11,21 +11,20 @@
     "make-deb": "node make-deb.js"
   },
   "repository": "https://github.com/KomodoPlatform/Agama/",
-  "homepage": "http://supernet.org",
+  "homepage": "http://komodoplatform.com",
   "keywords": [
     "agama",
     "SuperNET",
     "komodo",
     "multicoin",
     "wallet",
-    "spv"
+    "spv",
+    "jumblr"
   ],
   "author": "SuperNET Team",
   "license": "MIT",
   "devDependencies": {
-    "electron": "1.7.10",
-    "electron-installer-debian": "^0.6.0",
-    "electron-installer-redhat": "^0.5.0"
+    "electron": "1.8.3"
   },
   "dependencies": {
     "adm-zip": "^0.4.7",
@@ -41,7 +40,7 @@
     "body-parser": "^1.15.2",
     "buffer-reverse": "^1.0.1",
     "coinselect": "github:bitcoinjs/coinselect",
-    "electron": "1.8.2",
+    "electron": "1.8.3",
     "express": "^4.14.0",
     "fix-path": "^2.1.0",
     "fs-extra": "^4.0.2",

@@ -214,12 +214,15 @@ let electrumServers = {
     ],
   },
   ninja: { // !estimatefee
-    address: 'electrum.fund.ninja',
+    address: 'electrum1.fund.ninja',
     port: 50001,
     proto: 'tcp',
     txfee: 10000,
     abbr: 'NINJA',
-    serverList: 'none',
+    serverList: [
+      'electrum1.fund.ninja:50001',
+      'electrum2.fund.ninja:50001'
+    ],
   },
   jumblr: { // !estimatefee
     address: 'electrum1.cipig.net',
@@ -455,6 +458,17 @@ let electrumServers = {
     serverList: [
       '173.212.225.176:50013',
       '136.243.45.140:50013'
+    ],
+  },
+  sng: {
+    address: '45.77.254.232',
+    port: 10001,
+    proto: 'tcp',
+    txfee: 10000,
+    abbr: 'SNG',
+    serverList: [
+      '45.77.254.232:10001',
+      '128.199.233.38:10001'
     ],
   },
   xmy: {

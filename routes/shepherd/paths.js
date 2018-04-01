@@ -1,7 +1,7 @@
 const path = require('path');
 const fixPath = require('fix-path');
 const os = require('os');
-
+// TODO add the path to our bin here
 module.exports = (shepherd) => {
   shepherd.pathsAgama = () => {
     switch (os.platform()) {

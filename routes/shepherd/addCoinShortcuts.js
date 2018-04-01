@@ -53,6 +53,7 @@ module.exports = (shepherd) => {
           //resolve(body);
         }
       });
+// TODO Add our coin selection here, along with NODE address etc.
     } else if (selection === 'REVS') {
       const herdData = {
         'ac_name': 'REVS',

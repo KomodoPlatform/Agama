@@ -7,6 +7,7 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const url = require('url');
 const os = require('os');
+const { randomBytes } = require('crypto');
 const md5 = require('./routes/md5');
 const exec = require('child_process').exec;
 const { Menu } = require('electron');
@@ -54,7 +55,7 @@ app.setVersion(appBasicInfo.version);
 
 shepherd.createAgamaDirs();
 
-const appSessionHash = md5(Date.now().toString());
+const appSessionHash = randomBytes(32).toString('hex');
 const _spvFees = shepherd.getSpvFees();
 
 shepherd.writeLog(`app info: ${appBasicInfo.name} ${appBasicInfo.version}`);
@@ -70,6 +71,7 @@ shepherd.writeLog(`os_type: ${os.type()}`);
 if (process.argv.indexOf('devmode') > -1) {
 	shepherd.log(`app init ${appSessionHash}`);
 }
+
 shepherd.log(`app info: ${appBasicInfo.name} ${appBasicInfo.version}`);
 shepherd.log('sys info:');
 shepherd.log(`totalmem_readable: ${formatBytes(os.totalmem())}`);
@@ -100,7 +102,7 @@ guiapp.use((req, res, next) => {
 	next();
 });
 
-// preload.js
+// preload js
 const _setImmediate = setImmediate;
 const _clearImmediate = clearImmediate;
 
@@ -461,8 +463,6 @@ app.on('quit', (event) => {
 		// event.preventDefault();
 	}
 });
-
-app.commandLine.appendSwitch('ignore-certificate-errors'); // dirty hack
 
 function formatBytes(bytes, decimals) {
   if (bytes === 0) {

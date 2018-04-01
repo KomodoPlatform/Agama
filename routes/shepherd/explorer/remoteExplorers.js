@@ -17,5 +17,5 @@ const remoteExplorers = {
   COQUI: 'https://explorer.coqui.cash',
   MNZ: 'https://www.mnzexplorer.com',
 };
-
+// TODO Our landing page gets added to this list
 module.exports = remoteExplorers;

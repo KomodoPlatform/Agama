@@ -5,6 +5,8 @@ const bitcoinPos = require('bitcoinjs-lib-pos');
 // not prod ready, only for voting!
 // needs a fix
 
+// TODO: spread fee across targets
+//       current implementation subtracts fee from the fist target out
 module.exports = (shepherd) => {
   shepherd.post('/electrum/createrawtx-multiout', (req, res, next) => {
     if (shepherd.checkToken(req.body.token)) {
@@ -131,9 +133,12 @@ module.exports = (shepherd) => {
           let _change = 0;
 
           if (outputs &&
-              outputs.length > 1) {
+              outputs.length > 1 &&
+              outputs.length > targets.length) {
             _change = outputs[outputs.length - 1].value - fee;
           }
+
+          shepherd.log(`change before adjustments ${_change}`, true);
 
           if (!btcFee &&
               _change === 0) {
@@ -145,6 +150,9 @@ module.exports = (shepherd) => {
 
           shepherd.log('init targets', true);
           shepherd.log(initTargets, true);
+
+          shepherd.log('coinselect targets', true);
+          shepherd.log(targets, true);
 
           if (initTargets[0].value < targets[0].value) {
             targets[0].value = initTargets[0].value;
@@ -238,12 +246,11 @@ module.exports = (shepherd) => {
               res.end(JSON.stringify(successObj));
             } else {
               let vinSum = 0;
+              let voutSum = 0;
 
               for (let i = 0; i < inputs.length; i++) {
                 vinSum += inputs[i].value;
               }
-
-              let voutSum = 0;
 
               for (let i = 0; i < outputs.length; i++) {
                 voutSum += outputs[i].value;
@@ -272,7 +279,7 @@ module.exports = (shepherd) => {
 
               outputAddress = outputs;
 
-              if (outputAddress.length > 1) {
+              if (!outputAddress[outputAddress.length - 1].address) {
                 outputAddress.pop();
               }
 

@@ -1,5 +1,5 @@
 // TODO: merge with spv mode
-
+// TODO Add us to this list?
 const electrumServersList = {
   "ARG": [{"173.212.225.176": 50081},{"136.243.45.140": 50081}],
   "BET": [{"electrum2.cipig.net":10012},{"electrum1.cipig.net":10012}],
