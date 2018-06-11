@@ -1,7 +1,11 @@
+const os = require('os');
+const fsnode = require('fs');
+const _fs = require('graceful-fs');
+
 module.exports = (shepherd) => {
   // osx and linux
   shepherd.binFixRights = () => {
-    const osPlatform = shepherd.os.platform();
+    const osPlatform = os.platform();
     const _bins = [
       shepherd.komododBin,
       shepherd.komodocliBin
@@ -10,11 +14,11 @@ module.exports = (shepherd) => {
     if (osPlatform === 'darwin' ||
         osPlatform === 'linux') {
       for (let i = 0; i < _bins.length; i++) {
-        shepherd._fs.stat(_bins[i], (err, stat) => {
+        _fs.stat(_bins[i], (err, stat) => {
           if (!err) {
             if (parseInt(stat.mode.toString(8), 10) !== 100775) {
               shepherd.log(`${_bins[i]} fix permissions`);
-              shepherd.fsnode.chmodSync(_bins[i], '0775');
+              fsnode.chmodSync(_bins[i], '0775');
             }
           } else {
             shepherd.log(`error: ${_bins[i]} not found`);
@@ -26,8 +30,8 @@ module.exports = (shepherd) => {
 
   shepherd.killRogueProcess = (processName) => {
     // kill rogue process copies on start
+    const osPlatform = os.platform();
     let processGrep;
-    const osPlatform = shepherd.os.platform();
 
     switch (osPlatform) {
       case 'darwin':

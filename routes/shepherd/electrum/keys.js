@@ -9,7 +9,7 @@ const bs58check = require('bs58check');
 
 module.exports = (shepherd) => {
   shepherd.wifToWif = (wif, network) => {
-    network = network === 'KMD' ? 'komodo' : network.toLowerCase();
+    network = network.toLowerCase();
     const key = shepherd.isZcash(network) ? new bitcoinZcash.ECPair.fromWIF(wif, shepherd.getNetworkData(network), true) : new bitcoin.ECPair.fromWIF(wif, shepherd.getNetworkData(network), true);
 
     return {
@@ -20,7 +20,9 @@ module.exports = (shepherd) => {
 
   shepherd.seedToWif = (seed, network, iguana) => {
     let bytes;
+    network = network.toLowerCase();
 
+    // legacy seed edge case
     if (process.argv.indexOf('spvold=true') > -1) {
       bytes = buggySha256(seed, { asBytes: true });
     } else {
@@ -35,11 +37,30 @@ module.exports = (shepherd) => {
     }
 
     const d = bigi.fromBuffer(bytes);
-    const keyPair = shepherd.isZcash(network) ? new bitcoinZcash.ECPair(d, null, { network: shepherd.getNetworkData(network) }) : new bitcoin.ECPair(d, null, { network: shepherd.getNetworkData(network) });
-    const keys = {
+    let keyPair = shepherd.isZcash(network) ? new bitcoinZcash.ECPair(d, null, { network: shepherd.getNetworkData(network) }) : new bitcoin.ECPair(d, null, { network: shepherd.getNetworkData(network) });
+    let keys = {
       pub: keyPair.getAddress(),
       priv: keyPair.toWIF(),
+      pubHex: keyPair.getPublicKeyBuffer().toString('hex'),
     };
+
+    let isWif = false;
+
+    try {
+      bs58check.decode(seed);
+      isWif = true;
+    } catch (e) {}
+
+    if (isWif) {
+      try {
+        keyPair = shepherd.isZcash(network) ? bitcoinZcash.ECPair.fromWIF(seed, shepherd.getNetworkData(network), true) : bitcoin.ECPair.fromWIF(seed, shepherd.getNetworkData(network), true);
+        keys = {
+          priv: keyPair.toWIF(),
+          pub: keyPair.getAddress(),
+          pubHex: keyPair.getPublicKeyBuffer().toString('hex'),
+        };
+      } catch (e) {}
+    }
 
     /*shepherd.log(`seed: ${seed}`, true);
     shepherd.log(`network ${network}`, true);
@@ -56,28 +77,6 @@ module.exports = (shepherd) => {
         priv: key.toWIF(),
         pub: key.getAddress(),
       };
-
-      const successObj = {
-        msg: 'success',
-        result: {
-          keys,
-        },
-      };
-
-      res.end(JSON.stringify(successObj));
-    } else {
-      const errorObj = {
-        msg: 'error',
-        result: 'unauthorized access',
-      };
-
-      res.end(JSON.stringify(errorObj));
-    }
-  });
-
-  shepherd.post('/electrum/seedtowif', (req, res, next) => {
-    if (shepherd.checkToken(req.body.token)) {
-      let keys = shepherd.seedToWif(req.body.seed, req.body.network.toLowerCase(), req.body.iguana);
 
       const successObj = {
         msg: 'success',
@@ -142,7 +141,7 @@ module.exports = (shepherd) => {
       } else {
         return 'Unable to find matching coin version';
       }
-    } catch(e) {
+    } catch (e) {
       return 'Invalid pub address';
     }
   };
@@ -153,15 +152,25 @@ module.exports = (shepherd) => {
     try {
       const _b58check = shepherd.isZcash(network.toLowerCase()) ? bitcoinZcash.address.fromBase58Check(address) : bitcoin.address.fromBase58Check(address);
 
-      if (_b58check.version === _network.pubKeyHash) {
+      if (_b58check.version === _network.pubKeyHash ||
+          _b58check.version === _network.scriptHash) {
         return true;
       } else {
         return false;
       }
-    } catch(e) {
+    } catch (e) {
       return 'Invalid pub address';
     }
   };
+
+  shepherd.get('/electrum/keys/validateaddress', (req, res, next) => {
+    const successObj = {
+      msg: 'success',
+      result: shepherd.addressVersionCheck(req.query.network, req.query.address),
+    };
+
+    res.end(JSON.stringify(successObj));
+  });
 
   shepherd.post('/electrum/keys', (req, res, next) => {
     if (shepherd.checkToken(req.body.token)) {
@@ -173,7 +182,6 @@ module.exports = (shepherd) => {
 
       for (let key in shepherd.electrumCoins) {
         if (key !== 'auth') {
-          const _abbr = key;
           let isWif = false;
           let priv;
           let pub;
@@ -185,7 +193,7 @@ module.exports = (shepherd) => {
 
           if (isWif) {
             try {
-              let key = shepherd.isZcash(_abbr.toLowerCase()) ? bitcoinZcash.ECPair.fromWIF(_seed, shepherd.getNetworkData(_abbr.toLowerCase()), true) : bitcoin.ECPair.fromWIF(_seed, shepherd.getNetworkData(_abbr.toLowerCase()), true);
+              let key = shepherd.isZcash(key) ? bitcoinZcash.ECPair.fromWIF(_seed, shepherd.getNetworkData(key), true) : bitcoin.ECPair.fromWIF(_seed, shepherd.getNetworkData(key), true);
               priv = key.toWIF();
               pub = key.getAddress();
             } catch (e) {
@@ -193,13 +201,13 @@ module.exports = (shepherd) => {
               break;
             }
           } else {
-            let _keys = shepherd.seedToWif(_seed, shepherd.findNetworkObj(_abbr), req.body.iguana);
+            let _keys = shepherd.seedToWif(_seed, shepherd.findNetworkObj(key), req.body.iguana);
             priv = _keys.priv;
             pub = _keys.pub;
           }
 
-          if (shepherd.electrumKeys[_abbr].pub === pub &&
-              shepherd.electrumKeys[_abbr].priv === priv) {
+          if (shepherd.electrumKeys[key].pub === pub &&
+              shepherd.electrumKeys[key].priv === priv) {
             _matchingKeyPairs++;
           }
           _totalKeys++;
@@ -239,7 +247,7 @@ module.exports = (shepherd) => {
 
     for (let key in shepherd.electrumServers) {
       if (shepherd.electrumServers[key].txfee) {
-        _fees[shepherd.electrumServers[key].abbr] = shepherd.electrumServers[key].txfee;
+        _fees[key.toUpperCase()] = shepherd.electrumServers[key].txfee;
       }
     }
 

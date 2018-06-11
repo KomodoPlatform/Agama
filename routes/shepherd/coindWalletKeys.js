@@ -1,3 +1,8 @@
+const fs = require('fs-extra');
+const _fs = require('graceful-fs');
+const wif = require('wif');
+const bitcoinJS = require('bitcoinjs-lib');
+
 module.exports = (shepherd) => {
   /*
    *  type: GET
@@ -5,16 +10,14 @@ module.exports = (shepherd) => {
    */
   shepherd.get('/coindwalletkeys', (req, res, next) => {
     if (shepherd.checkToken(req.query.token)) {
-      const wif = require('wif');
-      const fs = require('fs');
       const chain = req.query.chain;
 
       // ref: https://gist.github.com/kendricktan/1e62495150ad236b38616d733aac4eb9
-      let _walletDatLocation = chain === 'komodo' || chain === 'null' ? `${shepherd.komodoDir}/wallet.dat` : `${shepherd.komodoDir}/${chain}/wallet.dat`;
+      let _walletDatLocation = chain === 'komodo' || chain === 'KMD' || chain === 'null' ? `${shepherd.komodoDir}/wallet.dat` : `${shepherd.komodoDir}/${chain}/wallet.dat`;
       _walletDatLocation = chain === 'CHIPS' ? `${shepherd.chipsDir}/wallet.dat` : _walletDatLocation;
 
       try {
-        shepherd._fs.access(_walletDatLocation, shepherd.fs.constants.R_OK, (err) => {
+        _fs.access(_walletDatLocation, shepherd.fs.constants.R_OK, (err) => {
           if (err) {
             shepherd.log(`error reading ${_walletDatLocation}`);
             successObj = {
@@ -60,7 +63,7 @@ module.exports = (shepherd) => {
                     const keyObj = wif.decode(key);
                     const wifKey = wif.encode(keyObj);
 
-                    const keyPair = shepherd.bitcoinJS.ECPair.fromWIF(wifKey, shepherd.electrumJSNetworks.komodo);
+                    const keyPair = bitcoinJS.ECPair.fromWIF(wifKey, shepherd.electrumJSNetworks.komodo);
                     const _keyPair = {
                       priv: keyPair.toWIF(),
                       pub: keyPair.getAddress(),

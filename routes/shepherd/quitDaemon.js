@@ -23,14 +23,21 @@ module.exports = (shepherd) => {
 
         const execCliStop = () => {
           let _arg = [];
+
           if (chain &&
-              !shepherd.nativeCoindList[key.toLowerCase()] && key !== 'CHIPS') {
+              !shepherd.nativeCoindList[key.toLowerCase()] &&
+              key !== 'CHIPS') {
+            shepherd.removePubkey(chain.toLowerCase());
+
             _arg.push(`-ac_name=${chain}`);
 
             if (shepherd.appConfig.dataDir.length) {
               _arg.push(`-datadir=${shepherd.appConfig.dataDir + (key !== 'komodod' ? '/' + key : '')}`);
             }
-          } else if (key === 'komodod' && shepherd.appConfig.dataDir.length) {
+          } else if (
+            key === 'komodod' &&
+            shepherd.appConfig.dataDir.length
+          ) {
             _arg.push(`-datadir=${shepherd.appConfig.dataDir}`);
           }
 
@@ -42,7 +49,7 @@ module.exports = (shepherd) => {
 
             if (stdout.indexOf('EOF reached') > -1 ||
                 stderr.indexOf('EOF reached') > -1 ||
-                (error && error.toString().indexOf('Command failed') > -1 && !stderr) || // win "special snowflake" case
+                (error && error.toString().indexOf('Command failed') > -1 && !stderr) || // windows
                 stdout.indexOf('connect to server: unknown (code -1)') > -1 ||
                 stderr.indexOf('connect to server: unknown (code -1)') > -1) {
               delete shepherd.coindInstanceRegistry[key];
@@ -87,7 +94,10 @@ module.exports = (shepherd) => {
       let _coindQuitCmd = shepherd.komodocliBin;
       let _arg = [];
 
+
       if (_chain) {
+        shepherd.removePubkey(_chain.toLowerCase());
+
         _arg.push(`-ac_name=${_chain}`);
 
         if (shepherd.appConfig.dataDir.length) {
@@ -152,6 +162,10 @@ module.exports = (shepherd) => {
 
       if (req.body.mode === 'native') {
         delete shepherd.coindInstanceRegistry[_chain ? _chain : 'komodod'];
+
+        if (_chain) {
+          shepherd.removePubkey(_chain.toLowerCase());
+        }
 
         const obj = {
           msg: 'success',

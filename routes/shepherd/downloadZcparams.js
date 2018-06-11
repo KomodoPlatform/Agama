@@ -1,3 +1,7 @@
+const fs = require('fs-extra');
+const _fs = require('graceful-fs');
+const Promise = require('bluebird');
+
 module.exports = (shepherd) => {
   shepherd.zcashParamsDownloadLinks = {
     'agama.komodoplatform.com': {
@@ -16,10 +20,10 @@ module.exports = (shepherd) => {
 
   shepherd.zcashParamsExist = () => {
     let _checkList = {
-      rootDir: shepherd._fs.existsSync(shepherd.zcashParamsDir),
-      provingKey: shepherd._fs.existsSync(`${shepherd.zcashParamsDir}/sprout-proving.key`),
+      rootDir: _fs.existsSync(shepherd.zcashParamsDir),
+      provingKey: _fs.existsSync(`${shepherd.zcashParamsDir}/sprout-proving.key`),
       provingKeySize: false,
-      verifyingKey: shepherd._fs.existsSync(`${shepherd.zcashParamsDir}/sprout-verifying.key`),
+      verifyingKey: _fs.existsSync(`${shepherd.zcashParamsDir}/sprout-verifying.key`),
       verifyingKeySize: false,
       errors: false,
     };
@@ -28,8 +32,8 @@ module.exports = (shepherd) => {
         _checkList.provingKey ||
         _checkList.verifyingKey) {
       // verify each key size
-      const _provingKeySize = _checkList.provingKey ? shepherd.fs.lstatSync(`${shepherd.zcashParamsDir}/sprout-proving.key`) : 0;
-      const _verifyingKeySize = _checkList.verifyingKey ? shepherd.fs.lstatSync(`${shepherd.zcashParamsDir}/sprout-verifying.key`) : 0;
+      const _provingKeySize = _checkList.provingKey ? fs.lstatSync(`${shepherd.zcashParamsDir}/sprout-proving.key`) : 0;
+      const _verifyingKeySize = _checkList.verifyingKey ? fs.lstatSync(`${shepherd.zcashParamsDir}/sprout-verifying.key`) : 0;
 
       if (Number(_provingKeySize.size) === 910173851) { // bytes
         _checkList.provingKeySize = true;
@@ -55,7 +59,7 @@ module.exports = (shepherd) => {
   }
 
   shepherd.zcashParamsExistPromise = () => {
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const _verify = shepherd.zcashParamsExist();
       resolve(_verify);
     });

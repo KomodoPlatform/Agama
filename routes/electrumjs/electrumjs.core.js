@@ -25,7 +25,6 @@ SOFTWARE.
 const tls = require('tls');
 const net = require('net');
 const EventEmitter = require('events').EventEmitter;
-const SOCKET_MAX_TIMEOUT = 10000;
 
 const makeRequest = function(method, params, id) {
   return JSON.stringify({
@@ -126,10 +125,10 @@ const getSocket = function(protocol, options) {
   throw new Error('unknown protocol');
 }
 
-const initSocket = function(self, protocol, options) {
+const initSocket = function(self, protocol, socketTimeout, options) {
   const conn = getSocket(protocol, options);
 
-  conn.setTimeout(SOCKET_MAX_TIMEOUT);
+  conn.setTimeout(socketTimeout);
   conn.on('timeout', () => {
     console.log('socket timeout');
     self.onError(new Error('socket timeout'));
@@ -158,13 +157,13 @@ const initSocket = function(self, protocol, options) {
 }
 
 class Client {
-  constructor(port, host, protocol = 'tcp', options = void 0) {
+  constructor(port, host, protocol = 'tcp', socketTimeout, options = void 0) {
     this.id = 0;
     this.port = port;
     this.host = host;
     this.callbackMessageQueue = {};
     this.subscribe = new EventEmitter();
-    this.conn = initSocket(this, protocol, options);
+    this.conn = initSocket(this, protocol, socketTimeout, options);
     this.mp = new util.MessageParser((body, n) => {
       this.onMessage(body, n);
     });

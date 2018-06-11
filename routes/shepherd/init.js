@@ -18,7 +18,7 @@ module.exports = (shepherd) => {
       fs.readdir(rootLocation, (err, items) => {
         for (let i = 0; i < items.length; i++) {
           if (items[i].substr(0, 3) === 'gen') {
-            console.log(items[i]);
+            shepherd.log(`remove ${items[i]}`);
             fs.unlinkSync(rootLocation + items[i]);
           }
         }
@@ -55,6 +55,17 @@ module.exports = (shepherd) => {
         }
       } else {
         shepherd.log('shepherd/pin folder already exists');
+      }
+
+      if (!fs.existsSync(`${shepherd.agamaDir}/shepherd/csv`)) {
+        fs.mkdirSync(`${shepherd.agamaDir}/shepherd/csv`);
+
+        if (fs.existsSync(`${shepherd.agamaDir}/shepherd/csv`)) {
+          shepherd.log(`created csv folder at ${shepherd.agamaDir}/shepherd/csv`);
+          shepherd.writeLog(`create csv folder at ${shepherd.agamaDir}/shepherd/csv`);
+        }
+      } else {
+        shepherd.log('shepherd/csv folder already exists');
       }
 
       if (!fs.existsSync(shepherd.zcashParamsDir)) {

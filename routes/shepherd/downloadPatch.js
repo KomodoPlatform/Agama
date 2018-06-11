@@ -1,3 +1,9 @@
+const path = require('path');
+const AdmZip = require('adm-zip');
+const remoteFileSize = require('remote-file-size');
+const fs = require('fs-extra');
+const request = require('request');
+
 module.exports = (shepherd) => {
   /*
    *  DL app patch
@@ -25,7 +31,7 @@ module.exports = (shepherd) => {
   });
 
   shepherd.updateAgama = () => {
-    const rootLocation = shepherd.path.join(__dirname, '../../');
+    const rootLocation = path.join(__dirname, '../../');
 
     shepherd.downloadFile({
       remoteFile: 'https://github.com/pbca26/dl-test/raw/master/patch.zip',
@@ -50,18 +56,18 @@ module.exports = (shepherd) => {
     .then(() => {
       shepherd.remoteFileSize('https://github.com/pbca26/dl-test/raw/master/patch.zip', (err, remotePatchSize) => {
         // verify that remote file is matching to DL'ed file
-        const localPatchSize = shepherd.fs.statSync(`${rootLocation}patch.zip`).size;
+        const localPatchSize = fs.statSync(`${rootLocation}patch.zip`).size;
         shepherd.log('compare dl file size');
 
         if (localPatchSize === remotePatchSize) {
-          const zip = new shepherd.AdmZip(`${rootLocation}patch.zip`);
+          const zip = new AdmZip(`${rootLocation}patch.zip`);
 
           shepherd.log('patch succesfully downloaded');
           shepherd.log('extracting contents');
 
           if (shepherd.appConfig.dev) {
-            if (!shepherd.fs.existsSync(`${rootLocation}/patch`)) {
-              shepherd.fs.mkdirSync(`${rootLocation}/patch`);
+            if (!fs.existsSync(`${rootLocation}/patch`)) {
+              fs.mkdirSync(`${rootLocation}/patch`);
             }
           }
 
@@ -73,7 +79,7 @@ module.exports = (shepherd) => {
               status: 'done',
             },
           });
-          shepherd.fs.unlinkSync(`${rootLocation}patch.zip`);
+          fs.unlinkSync(`${rootLocation}patch.zip`);
         } else {
           shepherd.io.emit('patch', {
             msg: {
@@ -95,18 +101,18 @@ module.exports = (shepherd) => {
    */
   shepherd.get('/update/patch/check', (req, res, next) => {
     if (shepherd.checkToken(req.query.token)) {
-      const rootLocation = shepherd.path.join(__dirname, '../../');
+      const rootLocation = path.join(__dirname, '../../');
       const options = {
         url: 'https://github.com/pbca26/dl-test/raw/master/version',
         method: 'GET',
       };
 
-      shepherd.request(options, (error, response, body) => {
+      request(options, (error, response, body) => {
         if (response &&
             response.statusCode &&
             response.statusCode === 200) {
           const remoteVersion = body.split('\n');
-          const localVersionFile = shepherd.fs.readFileSync(`${rootLocation}version`, 'utf8');
+          const localVersionFile = fs.readFileSync(`${rootLocation}version`, 'utf8');
           let localVersion;
 
           if (localVersionFile.indexOf('\r\n') > -1) {
@@ -157,8 +163,8 @@ module.exports = (shepherd) => {
    */
   shepherd.get('/unpack', (req, res, next) => {
     if (shepherd.checkToken(req.query.token)) {
-      const dlLocation = shepherd.path.join(__dirname, '../../');
-      const zip = new shepherd.AdmZip(`${dlLocation}patch.zip`);
+      const dlLocation = path.join(__dirname, '../../');
+      const zip = new AdmZip(`${dlLocation}patch.zip`);
       zip.extractAllTo(/*target path*/ `${dlLocation}/patch/unpack`, /*overwrite*/true);
 
       const successObj = {

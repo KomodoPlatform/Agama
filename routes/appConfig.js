@@ -20,6 +20,16 @@ const appConfig = {
     lang: 'EN',
     rpc2cli: false,
     fiatRates: false,
+    loadCoinsFromStorage: false,
+    requirePinToConfirmTx: false,
+    spv: {
+      maxVinParseLimit: 120,
+      cache: false,
+      proxy: false,
+      socketTimeout: 10000,
+      customServers: false,
+      syncServerListFromKv: false,
+    },
   },
   schema: {
     host: {
@@ -71,14 +81,14 @@ const appConfig = {
     experimentalFeatures: {
       display: true,
       initDisplay: true,
-      displayName: 'Enable experimental features',
+      displayName: 'Enable advanced features',
       type: 'boolean',
     },
     dataDir: {
       display: true,
       initDisplay: true,
       displayName: 'Komodo data directory',
-      info: 'The data directory is the location where Komodo data files are stored, including the wallet data file',
+      info: 'The data directory is the location where Komodo data files are stored, including the wallet data file<br/>It must be an already existing folder e.g. /home/user/komodo_data_dir.',
       type: 'folder',
     },
     dex: {
@@ -93,7 +103,7 @@ const appConfig = {
     cliStopTimeout: {
       display: true,
       displayName: 'CLI stop timeout',
-      info: 'Timeout between consequent CLI stop commands',
+      info: 'Timeout between consequent CLI stop commands. Value is in milliseconds.',
       type: 'number',
     },
     stopNativeDaemonsOnQuit: {
@@ -128,6 +138,56 @@ const appConfig = {
       displayName: 'Fetch fiat rates',
       info: 'Get coin fiat rates from atomicexplorer.com',
       type: 'boolean',
+    },
+    loadCoinsFromStorage: {
+      display: true,
+      displayName: 'Load coins list from file',
+      info: 'Add favourite coins on app start from a file',
+      type: 'boolean',
+    },
+    requirePinToConfirmTx: {
+      display: true,
+      displayName: 'Require PIN to confirm a transaction',
+      type: 'boolean',
+    },
+    spv: {
+      display: true,
+      displayName: 'Lite mode',
+      maxVinParseLimit: {
+        display: true,
+        displayName: 'Max tx inputs parse limit',
+        info: 'Maximum inputs to parse per transaction.<br/>Change to lower values if you have the app freeze constantly or to retrieve transaction history faster but with degraded accuracy.<br/>Change to higher values to get maximum transaction history accuracy.',
+        type: 'number',
+      },
+      cache: {
+        display: true,
+        displayName: 'Cache transactions data to disk',
+        type: 'boolean',
+      },
+      proxy: {
+        display: true,
+        displayName: 'Use proxy',
+        // info: 'Use remote http proxy to reduce data usage (gzip compression).',
+        type: 'boolean',
+      },
+      socketTimeout: {
+        display: true,
+        displayName: 'Socket timeout',
+        info: 'Max timeout before electrum server connection is dropped. Value is in milliseconds.',
+        type: 'number',
+      },
+      customServers: {
+        display: true,
+        displayName: 'Custom electrum servers list',
+        info: 'Allow electrum servers list changes.',
+        type: 'boolean',
+      },
+      syncServerListFromKv: {
+        display: true,
+        displayName: 'Sync electrum servers list from KV',
+        info: 'Warning, this is highly experimental feature!',
+        type: 'boolean',
+      },
     },
   },
 };

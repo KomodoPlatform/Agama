@@ -1,3 +1,6 @@
+const fs = require('fs-extra');
+const Promise = require('bluebird');
+
 module.exports = (shepherd) => {
   shepherd.log = (msg, isSpvOut) => {
     if (shepherd.appConfig.dev ||
@@ -5,17 +8,10 @@ module.exports = (shepherd) => {
       console.log(msg);
     }
 
-    if (!isSpvOut) {
-      shepherd.appRuntimeLog.push({
-        time: Date.now(),
-        msg: msg,
-      });
-    } else {
-      shepherd.appRuntimeSPVLog.push({
-        time: Date.now(),
-        msg: msg,
-      });
-    }
+    shepherd[!isSpvOut ? 'appRuntimeLog' : 'appRuntimeSPVLog'].push({
+      time: Date.now(),
+      msg: msg,
+    });
   }
 
   shepherd.writeLog = (data) => {
@@ -23,14 +19,14 @@ module.exports = (shepherd) => {
     const timeFormatted = new Date(Date.now()).toLocaleString('en-US', { hour12: false });
 
     if (shepherd.appConfig.debug) {
-      if (shepherd.fs.existsSync(`${logLocation}/agamalog.txt`)) {
-        shepherd.fs.appendFile(`${logLocation}/agamalog.txt`, `${timeFormatted}  ${data}\r\n`, (err) => {
+      if (fs.existsSync(`${logLocation}/agamalog.txt`)) {
+        fs.appendFile(`${logLocation}/agamalog.txt`, `${timeFormatted}  ${data}\r\n`, (err) => {
           if (err) {
             shepherd.log('error writing log file');
           }
         });
       } else {
-        shepherd.fs.writeFile(`${logLocation}/agamalog.txt`, `${timeFormatted}  ${data}\r\n`, (err) => {
+        fs.writeFile(`${logLocation}/agamalog.txt`, `${timeFormatted}  ${data}\r\n`, (err) => {
           if (err) {
             shepherd.log('error writing log file');
           }
@@ -58,7 +54,7 @@ module.exports = (shepherd) => {
   });
 
   shepherd.getAppRuntimeLog = () => {
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       resolve(shepherd.appRuntimeLog);
     });
   };
@@ -70,16 +66,17 @@ module.exports = (shepherd) => {
   shepherd.post('/guilog', (req, res, next) => {
     if (shepherd.checkToken(req.body.token)) {
       const logLocation = `${shepherd.agamaDir}/shepherd`;
+      const timestamp = req.body.timestamp;
 
       if (!shepherd.guiLog[shepherd.appSessionHash]) {
         shepherd.guiLog[shepherd.appSessionHash] = {};
       }
 
-      if (shepherd.guiLog[shepherd.appSessionHash][req.body.timestamp]) {
-        shepherd.guiLog[shepherd.appSessionHash][req.body.timestamp].status = req.body.status;
-        shepherd.guiLog[shepherd.appSessionHash][req.body.timestamp].response = req.body.response;
+      if (shepherd.guiLog[shepherd.appSessionHash][timestamp]) {
+        shepherd.guiLog[shepherd.appSessionHash][timestamp].status = req.body.status;
+        shepherd.guiLog[shepherd.appSessionHash][timestamp].response = req.body.response;
       } else {
-        shepherd.guiLog[shepherd.appSessionHash][req.body.timestamp] = {
+        shepherd.guiLog[shepherd.appSessionHash][timestamp] = {
           function: req.body.function,
           type: req.body.type,
           url: req.body.url,
@@ -88,7 +85,7 @@ module.exports = (shepherd) => {
         };
       }
 
-      shepherd.fs.writeFile(`${logLocation}/agamalog.json`, JSON.stringify(shepherd.guiLog), (err) => {
+      fs.writeFile(`${logLocation}/agamalog.json`, JSON.stringify(shepherd.guiLog), (err) => {
         if (err) {
           shepherd.writeLog('error writing gui log file');
         }
@@ -118,8 +115,8 @@ module.exports = (shepherd) => {
     if (shepherd.checkToken(req.query.token)) {
       const logExt = req.query.type === 'txt' ? 'txt' : 'json';
 
-      if (shepherd.fs.existsSync(`${shepherd.agamaDir}/shepherd/agamalog.${logExt}`)) {
-        shepherd.fs.readFile(`${shepherd.agamaDir}/shepherd/agamalog.${logExt}`, 'utf8', (err, data) => {
+      if (fs.existsSync(`${shepherd.agamaDir}/shepherd/agamalog.${logExt}`)) {
+        fs.readFile(`${shepherd.agamaDir}/shepherd/agamalog.${logExt}`, 'utf8', (err, data) => {
           if (err) {
             const errorObj = {
               msg: 'error',

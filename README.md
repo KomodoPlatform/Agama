@@ -78,3 +78,11 @@ change architecture build parameter to ```--arch=x64``` for 64 bit build
 On Windows it's noticed iguana.exe complains about `VCRUNTIME140D.DLL` and `ucrtbased.dll` file.
 
 Please see **windeps** directory and README file for instructions to install the required DLL files on Windows, and then try again running Agama App.
+
+## Optional packages to make rpm and deb distros
+
+electron-installer-debian
+
+electron-installer-redhat
+
+refer to ./make-deb.js and ./make-rpm.js

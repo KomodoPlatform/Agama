@@ -1,3 +1,8 @@
+const path = require('path');
+const _fs = require('graceful-fs');
+const Promise = require('bluebird');
+const os = require('os');
+
 module.exports = (shepherd) => {
   /*
    *  type: POST
@@ -9,18 +14,19 @@ module.exports = (shepherd) => {
       let _ac = req.body.ac;
       let _lastNLines = req.body.lastLines;
       let _location;
+      const _platform = os.platform();
 
-      if (shepherd.os.platform() === 'darwin') {
-        shepherd.komodoDir = shepherd.appConfig.dataDir.length ? shepherd.appConfig.dataDir : `${process.env.HOME}/Library/Application Support/Komodo`;
-      }
-
-      if (shepherd.os.platform() === 'linux') {
-        shepherd.komodoDir = shepherd.appConfig.dataDir.length ? shepherd.appConfig.dataDir : `${process.env.HOME}/.komodo`;
-      }
-
-      if (shepherd.os.platform() === 'win32') {
-        shepherd.komodoDir = shepherd.appConfig.dataDir.length ? shepherd.appConfig.dataDir : `${process.env.APPDATA}/Komodo`;
-        shepherd.komodoDir = shepherd.path.normalize(shepherd.komodoDir);
+      switch (_platform) {
+        case 'darwin':
+          shepherd.komodoDir = shepherd.appConfig.dataDir.length ? shepherd.appConfig.dataDir : `${process.env.HOME}/Library/Application Support/Komodo`;
+          break;
+        case 'linux':
+          shepherd.komodoDir = shepherd.appConfig.dataDir.length ? shepherd.appConfig.dataDir : `${process.env.HOME}/.komodo`;
+          break;
+        case 'win32':
+          shepherd.komodoDir = shepherd.appConfig.dataDir.length ? shepherd.appConfig.dataDir : `${process.env.APPDATA}/Komodo`;
+          shepherd.komodoDir = path.normalize(shepherd.komodoDir);
+          break;
       }
 
       if (_herd === 'komodo') {
@@ -63,7 +69,7 @@ module.exports = (shepherd) => {
 
   shepherd.get('/coind/stdout', (req, res) => {
     if (shepherd.checkToken(req.query.token)) {
-      const _daemonName = req.query.chain !== 'komodod' ? req.query.chain : 'komodod';
+      const _daemonName = req.query.chain !== 'komodod' && req.query.chain.toLowerCase() !== 'kmd' ? req.query.chain : 'komodod';
       const _daemonLogName = `${shepherd.agamaDir}/${_daemonName}.log`;
 
       shepherd.readDebugLog(_daemonLogName, 'all')
@@ -93,44 +99,42 @@ module.exports = (shepherd) => {
   });
 
   shepherd.readDebugLog = (fileLocation, lastNLines) => {
-    return new shepherd.Promise(
-      (resolve, reject) => {
-        if (lastNLines) {
-          try {
-            shepherd._fs.access(fileLocation, shepherd.fs.constants.R_OK, (err) => {
-              if (err) {
-                shepherd.log(`error reading ${fileLocation}`);
-                shepherd.writeLog(`error reading ${fileLocation}`);
-                reject(`readDebugLog error: ${err}`);
-              } else {
-                shepherd.log(`reading ${fileLocation}`);
-                shepherd._fs.readFile(fileLocation, 'utf-8', (err, data) => {
-                  if (err) {
-                    shepherd.writeLog(`readDebugLog err: ${err}`);
-                    shepherd.log(`readDebugLog err: ${err}`);
-                  }
+    return new Promise((resolve, reject) => {
+      if (lastNLines) {
+        try {
+          _fs.access(fileLocation, shepherd.fs.constants.R_OK, (err) => {
+            if (err) {
+              shepherd.log(`error reading ${fileLocation}`);
+              shepherd.writeLog(`error reading ${fileLocation}`);
+              reject(`readDebugLog error: ${err}`);
+            } else {
+              shepherd.log(`reading ${fileLocation}`);
+              _fs.readFile(fileLocation, 'utf-8', (err, data) => {
+                if (err) {
+                  shepherd.writeLog(`readDebugLog err: ${err}`);
+                  shepherd.log(`readDebugLog err: ${err}`);
+                }
 
-                  const lines = data.trim().split('\n');
-                  let lastLine;
+                const lines = data.trim().split('\n');
+                let lastLine;
 
-                  if (lastNLines === 'all') {
-                    lastLine = data.trim();
-                  } else {
-                    lastLine = lines.slice(lines.length - lastNLines, lines.length).join('\n');
-                  }
+                if (lastNLines === 'all') {
+                  lastLine = data.trim();
+                } else {
+                  lastLine = lines.slice(lines.length - lastNLines, lines.length).join('\n');
+                }
 
-                  resolve(lastLine);
-                });
-              }
-            });
-          } catch (e) {
-            reject(`readDebugLog error: ${e}`);
-          }
-        } else {
-          reject('readDebugLog error: lastNLines param is not provided!');
+                resolve(lastLine);
+              });
+            }
+          });
+        } catch (e) {
+          reject(`readDebugLog error: ${e}`);
         }
+      } else {
+        reject('readDebugLog error: lastNLines param is not provided!');
       }
-    );
+    });
   };
 
   return shepherd;

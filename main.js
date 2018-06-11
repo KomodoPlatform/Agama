@@ -7,6 +7,7 @@ const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 const url = require('url');
 const os = require('os');
+const { randomBytes } = require('crypto');
 const md5 = require('./routes/md5');
 const exec = require('child_process').exec;
 const { Menu } = require('electron');
@@ -19,6 +20,7 @@ const fsnode = require('fs');
 const fs = require('fs-extra');
 const Promise = require('bluebird');
 const arch = require('arch');
+const bip39 = require('bip39');
 
 if (osPlatform === 'linux') {
 	process.env.ELECTRON_RUN_AS_NODE = true;
@@ -54,7 +56,30 @@ app.setVersion(appBasicInfo.version);
 
 shepherd.createAgamaDirs();
 
-const appSessionHash = md5(Date.now().toString());
+// parse argv
+let _argv = {};
+
+for (let i = 0; i < process.argv.length; i++) {
+  if (process.argv[i].indexOf('nogui') > -1) {
+  	_argv.nogui = true;
+    shepherd.log('enable nogui mode');
+  }
+
+  if (process.argv[i].indexOf('=') > -1) {
+	  const _argvSplit = process.argv[i].split('=');
+	  _argv[_argvSplit[0]] = _argvSplit[1];
+  }
+
+  if (!_argv.nogui) {
+  	_argv = {};
+  } else {
+  	shepherd.argv = _argv;
+  	shepherd.log('arguments');
+  	shepherd.log(_argv);
+  }
+}
+
+const appSessionHash = _argv.token ? _argv.token : randomBytes(32).toString('hex');
 const _spvFees = shepherd.getSpvFees();
 
 shepherd.writeLog(`app info: ${appBasicInfo.name} ${appBasicInfo.version}`);
@@ -67,9 +92,11 @@ shepherd.writeLog(`platform: ${osPlatform}`);
 shepherd.writeLog(`os_release: ${os.release()}`);
 shepherd.writeLog(`os_type: ${os.type()}`);
 
-if (process.argv.indexOf('devmode') > -1) {
+if (process.argv.indexOf('devmode') > -1 ||
+		process.argv.indexOf('nogui') > -1) {
 	shepherd.log(`app init ${appSessionHash}`);
 }
+
 shepherd.log(`app info: ${appBasicInfo.name} ${appBasicInfo.version}`);
 shepherd.log('sys info:');
 shepherd.log(`totalmem_readable: ${formatBytes(os.totalmem())}`);
@@ -100,7 +127,7 @@ guiapp.use((req, res, next) => {
 	next();
 });
 
-// preload.js
+// preload js
 const _setImmediate = setImmediate;
 const _clearImmediate = clearImmediate;
 
@@ -122,8 +149,7 @@ process.once('loaded', () => {
 });
 
 // silent errors
-if (!appConfig.debug ||
-		!appConfig.dev) {
+if (!appConfig.dev) {
 	process.on('uncaughtException', (err) => {
 	  shepherd.log(`${(new Date).toUTCString()} uncaughtException: ${err.message}`);
 	  shepherd.log(err.stack);
@@ -153,6 +179,28 @@ let appCloseWindow;
 let closeAppAfterLoading = false;
 let forceQuitApp = false;
 
+// apply parsed argv
+if (shepherd.argv) {
+	if (shepherd.argv.coins) {
+		const _coins = shepherd.argv.coins.split(',');
+
+		for (let i = 0; i < _coins.length; i++) {
+			shepherd.addElectrumCoin(_coins[i].toUpperCase());
+			console.log(`add coin from argv ${_coins[i]}`);
+		}
+	}
+
+	if (shepherd.argv.seed) {
+		const _seed = shepherd.argv.seed.split('=');
+
+		if (_seed &&
+				_seed[0]) {
+			console.log('load seed from argv');
+			shepherd.auth(_seed[0], true);
+		}
+	}
+}
+
 module.exports = guiapp;
 let agamaIcon;
 
@@ -169,7 +217,19 @@ function forseCloseApp() {
 	app.quit();
 }
 
-app.on('ready', () => createWindow('open', process.argv.indexOf('dexonly') > -1 ? true : null));
+if (!_argv.nogui || (_argv.nogui && _argv.nogui === '1')) {
+	app.on('ready', () => createWindow('open', process.argv.indexOf('dexonly') > -1 ? true : null));
+} else {
+	server.listen(appConfig.agamaPort, () => {
+		shepherd.log(`guiapp and sockets.io are listening on port ${appConfig.agamaPort}`);
+		shepherd.writeLog(`guiapp and sockets.io are listening on port ${appConfig.agamaPort}`);
+		// start sockets.io
+		io.set('origins', appConfig.dev ? 'http://127.0.0.1:3000' : null); // set origin
+	});
+	shepherd.setIO(io); // pass sockets object to shepherd router
+	shepherd.setVar('appBasicInfo', appBasicInfo);
+	shepherd.setVar('appSessionHash', appSessionHash);
+}
 
 function createAppCloseWindow() {
 	// initialise window
@@ -183,7 +243,7 @@ function createAppCloseWindow() {
 
 	appCloseWindow.setResizable(false);
 
-	appCloseWindow.loadURL(`http://${appConfig.host}:${appConfig.agamaPort}/gui/startup/app-closing.html`);
+	appCloseWindow.loadURL(appConfig.dev ? `http://${appConfig.host}:${appConfig.agamaPort}/gui/startup/app-closing.html` : `file://${__dirname}/gui/startup/app-closing.html`);
 
   appCloseWindow.webContents.on('did-finish-load', () => {
     setTimeout(() => {
@@ -230,7 +290,7 @@ function createWindow(status, hideLoadingWindow) {
 					shepherd.log(`guiapp and sockets.io are listening on port ${appConfig.agamaPort}`);
 					shepherd.writeLog(`guiapp and sockets.io are listening on port ${appConfig.agamaPort}`);
 					// start sockets.io
-					io.set('origins', appConfig.dev ? 'http://127.0.0.1:3000' : `http://127.0.0.1:${appConfig.agamaPort}`); // set origin
+					io.set('origins', appConfig.dev ? 'http://127.0.0.1:3000' : null); // set origin
 				});
 
 				// initialise window
@@ -244,15 +304,15 @@ function createWindow(status, hideLoadingWindow) {
 				if (appConfig.dev) {
 					mainWindow.loadURL('http://127.0.0.1:3000');
 				} else {
-					mainWindow.loadURL(`http://${appConfig.host}:${appConfig.agamaPort}/gui/EasyDEX-GUI/react/build`);
+					mainWindow.loadURL(`file://${__dirname}/gui/EasyDEX-GUI/react/build/index.html`);
 				}
 
 				shepherd.setIO(io); // pass sockets object to shepherd router
 				shepherd.setVar('appBasicInfo', appBasicInfo);
 				shepherd.setVar('appSessionHash', appSessionHash);
 
-				// load our index.html (i.e. easyDEX GUI)
-				shepherd.writeLog('show edex gui');
+				// load our index.html (i.e. Agama GUI)
+				shepherd.writeLog('show agama gui');
 				mainWindow.appConfig = appConfig;
 				mainWindow.appConfigSchema = shepherd.appConfigSchema;
 				mainWindow.arch = arch();
@@ -286,15 +346,22 @@ function createWindow(status, hideLoadingWindow) {
 					firstLoginPH: null,
 					secondaryLoginPH: null,
 				};
+				mainWindow.checkStringEntropy = shepherd.checkStringEntropy;
+				mainWindow.pinAccess = false;
+				mainWindow.bip39 = bip39;
+				mainWindow.isWatchOnly = shepherd.isWatchOnly;
+				mainWindow.setPubkey = shepherd.setPubkey;
+				mainWindow.getPubkeys = shepherd.getPubkeys;
+				mainWindow.kvEncode = shepherd.kvEncode;
+				mainWindow.kvDecode = shepherd.kvDecode;
+				mainWindow.electrumServers = shepherd.electrumServers;
 
-				mainWindow.nnVoteChain = 'VOTE2018';
-
-			  /*for (let i = 0; i < process.argv.length; i++) {
+			  for (let i = 0; i < process.argv.length; i++) {
 			    if (process.argv[i].indexOf('nvote') > -1) {
-			      console.log(`notary node elections chain ${process.argv[i].replace('nvote=', '')}`);
-			      mainWindow.nnVoteChain = process.argv[i].replace('nvote=', '');
+			      console.log('enable notary node elections ui');
+			      mainWindow.nnVoteChain = 'VOTE2018';
 			    }
-			  }*/
+			  }
 			} else {
 				mainWindow = new BrowserWindow({
 					width: 500,
@@ -312,7 +379,7 @@ function createWindow(status, hideLoadingWindow) {
 					shepherd.log(`guiapp and sockets.io are listening on port ${appConfig.agamaPort + 1}`);
 					shepherd.writeLog(`guiapp and sockets.io are listening on port ${appConfig.agamaPort + 1}`);
 				});
-				mainWindow.loadURL(`http://${appConfig.host}:${appConfig.agamaPort + 1}/gui/startup/agama-instance-error.html`);
+				mainWindow.loadURL(appConfig.dev ? `http://${appConfig.host}:${appConfig.agamaPort + 1}/gui/startup/agama-instance-error.html` : `file://${__dirname}/gui/startup/agama-instance-error.html`);
 				shepherd.log('another agama app is already running');
 			}
 
@@ -347,6 +414,11 @@ function createWindow(status, hideLoadingWindow) {
 			// mainWindow.webContents.openDevTools()
 
 			function appExit() {
+				if (shepherd.appConfig.spv &&
+						shepherd.appConfig.spv.cache) {
+					shepherd.saveLocalSPVCache();
+				}
+
 				const CloseDaemons = () => {
 					return new Promise((resolve, reject) => {
 						shepherd.log('Closing Main Window...');
@@ -461,8 +533,6 @@ app.on('quit', (event) => {
 		// event.preventDefault();
 	}
 });
-
-app.commandLine.appendSwitch('ignore-certificate-errors'); // dirty hack
 
 function formatBytes(bytes, decimals) {
   if (bytes === 0) {

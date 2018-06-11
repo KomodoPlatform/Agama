@@ -1,5 +1,8 @@
 const fs = require('fs-extra');
 const os = require('os');
+const exec = require('child_process').exec;
+const execFile = require('child_process').execFile;
+const request = require('request');
 
 module.exports = (shepherd) => {
   shepherd.getConf = (chain) => {
@@ -16,8 +19,8 @@ module.exports = (shepherd) => {
       }
 
       if (fs.existsSync(_confLocation)) {
-        let _port = shepherd.assetChainPorts[chain];
         const _rpcConf = fs.readFileSync(_confLocation, 'utf8');
+        let _port = shepherd.assetChainPorts[chain];
 
         // any coind
         if (shepherd.nativeCoindList[chain.toLowerCase()]) {
@@ -111,9 +114,9 @@ module.exports = (shepherd) => {
               _arg = `${_arg} -datadir=${shepherd.appConfig.dataDir  + (_chain ? '/' + key : '')}`;
             }
 
-            shepherd.exec(`"${_coindCliBin}" ${_arg}`, (error, stdout, stderr) => {
-              //shepherd.log(`stdout: ${stdout}`);
-              //shepherd.log(`stderr: ${stderr}`);
+            exec(`"${_coindCliBin}" ${_arg}`, (error, stdout, stderr) => {
+              // shepherd.log(`stdout: ${stdout}`);
+              // shepherd.log(`stderr: ${stderr}`);
 
               if (error !== null) {
                 shepherd.log(`exec error: ${error}`);
@@ -265,7 +268,7 @@ module.exports = (shepherd) => {
 
                 // send back body on both success and error
                 // this bit replicates iguana core's behaviour
-                shepherd.request(options, (error, response, body) => {
+                request(options, (error, response, body) => {
                   if (response &&
                       response.statusCode &&
                       response.statusCode === 200) {
@@ -299,7 +302,7 @@ module.exports = (shepherd) => {
           }
 
           _arg = _arg.trim().split(' ');
-          shepherd.execFile(_coindCliBin, _arg, (error, stdout, stderr) => {
+          execFile(_coindCliBin, _arg, (error, stdout, stderr) => {
             shepherd.log(`stdout: ${stdout}`);
             shepherd.log(`stderr: ${stderr}`);
 

@@ -58,12 +58,12 @@ module.exports = (shepherd) => {
         }
         break;
       case 'coind':
-        DaemonConfPath = _platform === 'win32' ? shepherd.path.normalize(`${shepherd.coindRootDir}/${coind.toLowerCase()}`) : `${shepherd.coindRootDir}/${coind.toLowerCase()}`;
+        DaemonConfPath = _platform === 'win32' ? path.normalize(`${shepherd.coindRootDir}/${coind.toLowerCase()}`) : `${shepherd.coindRootDir}/${coind.toLowerCase()}`;
         break;
       default:
         DaemonConfPath = `${shepherd.komodoDir}/${flock}`;
         if (_platform === 'win32') {
-          DaemonConfPath = shepherd.path.normalize(DaemonConfPath);
+          DaemonConfPath = path.normalize(DaemonConfPath);
         }
     }
 
@@ -187,12 +187,14 @@ module.exports = (shepherd) => {
               change: '-pubkey=',
               datadir: '-datadir=',
               rescan: '-rescan',
+              gen: '-gen',
             };
             let _customParam = '';
 
             if (data.ac_custom_param === 'silent' ||
                 data.ac_custom_param === 'reindex' ||
-                data.ac_custom_param === 'rescan') {
+                data.ac_custom_param === 'rescan' ||
+                data.ac_custom_param === 'gen') {
               _customParam = ` ${_customParamDict[data.ac_custom_param]}`;
             } else if (data.ac_custom_param === 'change' && data.ac_custom_param_value) {
               _customParam = ` ${_customParamDict[data.ac_custom_param]}${data.ac_custom_param_value}`;
@@ -230,7 +232,11 @@ module.exports = (shepherd) => {
                 let spawnErr = fs.openSync(_daemonLogName, 'a');
 
                 spawn(shepherd.komododBin, _arg, {
-                  stdio: ['ignore', spawnOut, spawnErr],
+                  stdio: [
+                    'ignore',
+                    spawnOut,
+                    spawnErr
+                  ],
                   detached: true,
                 }).unref();
               } else {
@@ -355,14 +361,14 @@ module.exports = (shepherd) => {
 
             shepherd.log(`daemon param ${data.ac_custom_param}`);
 
-            shepherd.coindInstanceRegistry['CHIPS'] = true;
+            shepherd.coindInstanceRegistry.CHIPS = true;
             let _arg = `${_customParam}`;
             _arg = _arg.trim().split(' ');
 
             if (_arg &&
                 _arg.length > 1) {
               execFile(`${shepherd.chipsBin}`, _arg, {
-                maxBuffer: 1024 * 1000000 // 1000 mb
+                maxBuffer: 1024 * 1000000, // 1000 mb
               }, (error, stdout, stderr) => {
                 shepherd.writeLog(`stdout: ${stdout}`);
                 shepherd.writeLog(`stderr: ${stderr}`);
@@ -439,7 +445,7 @@ module.exports = (shepherd) => {
             fs.unlink(coindDebugLogLocation);
           }
         });
-       } catch(e) {
+       } catch (e) {
          shepherd.log(`coind ${coind} debug.log access err: ${e}`);
          shepherd.writeLog(`coind ${coind} debug.log access err: ${e}`);
        }
@@ -460,7 +466,7 @@ module.exports = (shepherd) => {
             let _arg = `${data.ac_options.join(' ')}`;
             _arg = _arg.trim().split(' ');
             execFile(`${coindBin}`, _arg, {
-              maxBuffer: 1024 * 1000000 // 1000 mb
+              maxBuffer: 1024 * 1000000, // 1000 mb
             }, (error, stdout, stderr) => {
               shepherd.writeLog(`stdout: ${stdout}`);
               shepherd.writeLog(`stderr: ${stderr}`);
@@ -475,7 +481,7 @@ module.exports = (shepherd) => {
             shepherd.writeLog(`port ${_port} (${coind}) is already in use`);
           }
         });
-      } catch(e) {
+      } catch (e) {
         shepherd.log(`failed to start ${coind} err: ${e}`);
         shepherd.writeLog(`failed to start ${coind} err: ${e}`);
       }
@@ -609,7 +615,7 @@ module.exports = (shepherd) => {
                 shepherd.log('rpcuser: OK');
                 shepherd.writeLog('rpcuser: OK');
               } else {
-                const randomstring = shepherd.md5((Math.random() * Math.random() * 999).toString());
+                const randomstring = md5((Math.random() * Math.random() * 999).toString());
 
                 shepherd.log('rpcuser: NOT FOUND');
                 shepherd.writeLog('rpcuser: NOT FOUND');
@@ -647,7 +653,6 @@ module.exports = (shepherd) => {
                     shepherd.writeLog(`append daemon conf err: ${err}`);
                     shepherd.log(`append daemon conf err: ${err}`);
                   }
-                  // throw err;
                   shepherd.log('rpcpassword: ADDED');
                   shepherd.writeLog('rpcpassword: ADDED');
                 });
@@ -674,7 +679,6 @@ module.exports = (shepherd) => {
                       shepherd.writeLog(`append daemon conf err: ${err}`);
                       shepherd.log(`append daemon conf err: ${err}`);
                     }
-                    // throw err;
                     shepherd.log('rpcport: ADDED');
                     shepherd.writeLog('rpcport: ADDED');
                   });
@@ -750,7 +754,6 @@ module.exports = (shepherd) => {
                       shepherd.writeLog(`append daemon conf err: ${err}`);
                       shepherd.log(`append daemon conf err: ${err}`);
                     }
-                    // throw err;
                     shepherd.log('addnode: ADDED');
                     shepherd.writeLog('addnode: ADDED');
                   });

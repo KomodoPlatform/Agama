@@ -21,6 +21,8 @@ const assetChainPorts = {
   'BOTS': '11964',
   'MGW': '12386',
   'COQUI': '14276',
+  'CHAIN': '15587',
+  'GLXT': '15723',
   'MVP': '11676',
   'KV': '8299',
   'CEAL': '11116',
@@ -30,6 +32,10 @@ const assetChainPorts = {
   'VOTE2018': '15488',
   'NINJA': '8427',
   'BTCH': '8800',
+  'BNTN': '14358',
+  'EQL': '10306',
+  'PRLPAY': '9679',
+  'ZILLA': '10041',
 };
 
 module.exports = assetChainPorts;

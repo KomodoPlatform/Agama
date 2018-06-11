@@ -1,8 +1,9 @@
 const fs = require('fs-extra');
+const Promise = require('bluebird');
 
 module.exports = (shepherd) => {
   shepherd.getMaxconKMDConf = () => {
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       fs.readFile(`${shepherd.komodoDir}/komodo.conf`, 'utf8', (err, data) => {
         if (err) {
           shepherd.log('kmd conf maxconnections param read failed');
@@ -23,7 +24,7 @@ module.exports = (shepherd) => {
   }
 
   shepherd.setMaxconKMDConf = (limit) => {
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       fs.readFile(`${shepherd.komodoDir}/komodo.conf`, 'utf8', (err, data) => {
         const _maxconVal = limit ? 1 : 10;
 

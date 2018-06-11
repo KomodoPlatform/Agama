@@ -1,6 +1,8 @@
+const bitcoinJS = require('bitcoinjs-lib');
 const bitcoinJSForks = require('bitcoinforksjs-lib');
 const bitcoinZcash = require('bitcoinjs-lib-zcash');
 const bitcoinPos = require('bitcoinjs-lib-pos');
+const coinSelect = require('coinselect');
 
 module.exports = (shepherd) => {
   // unsigned tx
@@ -9,11 +11,11 @@ module.exports = (shepherd) => {
 
     // TODO: finish unsigned for zcash, btc forks and pos coins
     if (network === 'btg') {
-      shepherd.log('enable btg', true);
       tx = new bitcoinJSForks.TransactionBuilder(shepherd.getNetworkData(network));
       tx.enableBitcoinGold(true);
+      shepherd.log('enable btg', true);
     } else {
-      tx = new shepherd.bitcoinJS.TransactionBuilder(shepherd.getNetworkData(network));
+      tx = new bitcoinJS.TransactionBuilder(shepherd.getNetworkData(network));
     }
 
     shepherd.log('buildSignedTx', true);
@@ -32,7 +34,7 @@ module.exports = (shepherd) => {
     }
 
     if (network === 'komodo' ||
-        network === 'KMD') {
+        network.toUpperCase() === 'KMD') {
       const _locktime = Math.floor(Date.now() / 1000) - 777;
       tx.setLockTime(_locktime);
       shepherd.log(`kmd tx locktime set to ${_locktime}`, true);
@@ -55,7 +57,7 @@ module.exports = (shepherd) => {
 
   // single sig
   shepherd.buildSignedTx = (sendTo, changeAddress, wif, network, utxo, changeValue, spendValue, opreturn) => {
-    let key = shepherd.isZcash(network) ? bitcoinZcash.ECPair.fromWIF(wif, shepherd.getNetworkData(network)) : shepherd.bitcoinJS.ECPair.fromWIF(wif, shepherd.getNetworkData(network));
+    let key = shepherd.isZcash(network) ? bitcoinZcash.ECPair.fromWIF(wif, shepherd.getNetworkData(network)) : bitcoinJS.ECPair.fromWIF(wif, shepherd.getNetworkData(network));
     let tx;
 
     if (shepherd.isZcash(network)) {
@@ -63,7 +65,7 @@ module.exports = (shepherd) => {
     } else if (shepherd.isPos(network)) {
       tx = new bitcoinPos.TransactionBuilder(shepherd.getNetworkData(network));
     } else {
-      tx = new shepherd.bitcoinJS.TransactionBuilder(shepherd.getNetworkData(network));
+      tx = new bitcoinJS.TransactionBuilder(shepherd.getNetworkData(network));
     }
 
     shepherd.log('buildSignedTx', true);
@@ -76,28 +78,36 @@ module.exports = (shepherd) => {
     }
 
     if (shepherd.isPos(network)) {
-      tx.addOutput(sendTo, Number(spendValue), shepherd.getNetworkData(network));
+      tx.addOutput(
+        sendTo,
+        Number(spendValue),
+        shepherd.getNetworkData(network)
+      );
     } else {
       tx.addOutput(sendTo, Number(spendValue));
     }
 
     if (changeValue > 0) {
       if (shepherd.isPos(network)) {
-        tx.addOutput(changeAddress, Number(changeValue), shepherd.getNetworkData(network));
+        tx.addOutput(
+          changeAddress,
+          Number(changeValue),
+          shepherd.getNetworkData(network)
+        );
       } else {
         tx.addOutput(changeAddress, Number(changeValue));
       }
     }
 
     if (opreturn) {
-      console.log(`opreturn ${opreturn}`);
       const data = Buffer.from(opreturn, 'utf8');
       const dataScript = shepherd.bitcoinJS.script.nullData.output.encode(data);
       tx.addOutput(dataScript, 1000);
+      shepherd.log(`opreturn ${opreturn}`, true);
     }
 
     if (network === 'komodo' ||
-        network === 'KMD') {
+        network.toUpperCase() === 'KMD') {
       const _locktime = Math.floor(Date.now() / 1000) - 777;
       tx.setLockTime(_locktime);
       shepherd.log(`kmd tx locktime set to ${_locktime}`, true);
@@ -112,7 +122,11 @@ module.exports = (shepherd) => {
 
     for (let i = 0; i < utxo.length; i++) {
       if (shepherd.isPos(network)) {
-        tx.sign(shepherd.getNetworkData(network), i, key);
+        tx.sign(
+          shepherd.getNetworkData(network),
+          i,
+          key
+        );
       } else {
         tx.sign(i, key);
       }
@@ -142,7 +156,12 @@ module.exports = (shepherd) => {
     shepherd.log(`buildSignedTx${network.toUpperCase()}`, true);
 
     for (let i = 0; i < utxo.length; i++) {
-      tx.addInput(utxo[i].txid, utxo[i].vout, bitcoinJSForks.Transaction.DEFAULT_SEQUENCE, spk);
+      tx.addInput(
+        utxo[i].txid,
+        utxo[i].vout,
+        bitcoinJSForks.Transaction.DEFAULT_SEQUENCE,
+        spk
+      );
     }
 
     tx.addOutput(sendTo, Number(spendValue));
@@ -169,7 +188,13 @@ module.exports = (shepherd) => {
     const hashType = bitcoinJSForks.Transaction.SIGHASH_ALL | bitcoinJSForks.Transaction.SIGHASH_BITCOINCASHBIP143;
 
     for (let i = 0; i < utxo.length; i++) {
-      tx.sign(i, keyPair, null, hashType, utxo[i].value);
+      tx.sign(
+        i,
+        keyPair,
+        null,
+        hashType,
+        utxo[i].value
+      );
     }
 
     const rawtx = tx.build().toHex();
@@ -194,25 +219,54 @@ module.exports = (shepherd) => {
     }
   }
 
-  shepherd.get('/electrum/createrawtx', (req, res, next) => {
-    if (shepherd.checkToken(req.query.token)) {
-      // TODO: unconf output(s) error message
-      const network = req.query.network || shepherd.findNetworkObj(req.query.coin);
-      const ecl = new shepherd.electrumJSCore(shepherd.electrumServers[network].port, shepherd.electrumServers[network].address, shepherd.electrumServers[network].proto); // tcp or tls
-      const outputAddress = req.query.address;
-      const changeAddress = req.query.change;
-      const push = req.query.push;
-      const opreturn = req.query.opreturn;
-      const btcFee = req.query.btcfee ? Number(req.query.btcfee) : null;
-      let fee = shepherd.electrumServers[network].txfee;
-      let value = Number(req.query.value);
-      let wif = req.query.wif;
+  shepherd._listunspent = (grainedControlUtxos, ecl, changeAddress, network, full, verify) => {
+    shepherd.log(`verify ${verify}`, true);
 
-      if (req.query.gui) {
-        wif = shepherd.electrumKeys[req.query.coin].priv;
+    return new Promise((resolve, reject) => {
+      if (grainedControlUtxos) {
+        resolve(grainedControlUtxos);
+      } else {
+        shepherd.listunspent(
+          ecl,
+          changeAddress,
+          network,
+          true,
+          verify === true ? true : null
+        )
+        .then((utxoList) => {
+          resolve(utxoList);
+        });
+      }
+    });
+  };
+
+  shepherd.get('/electrum/createrawtx', (req, res, next) => {
+    shepherd.createTx(req, res, next);
+  });
+
+  shepherd.post('/electrum/createrawtx', (req, res, next) => {
+    shepherd.createTx(req, res, next, 'body');
+  });
+
+  shepherd.createTx = (req, res, next, reqType = 'query') => {
+    if (shepherd.checkToken(req[reqType].token)) {
+      // TODO: unconf output(s) error message
+      const network = req[reqType].network || shepherd.findNetworkObj(req[reqType].coin);
+      const ecl = shepherd.ecl(network);
+      const outputAddress = req[reqType].address;
+      const changeAddress = req[reqType].change;
+      const push = req[reqType].push;
+      const opreturn = req[reqType].opreturn;
+      const btcFee = req[reqType].btcfee ? Number(req[reqType].btcfee) : null;
+      let fee = shepherd.electrumServers[network].txfee;
+      let value = Number(req[reqType].value);
+      let wif = req[reqType].wif;
+
+      if (req[reqType].gui) {
+        wif = shepherd.electrumKeys[req[reqType].coin.toLowerCase()].priv;
       }
 
-      if (req.query.vote) {
+      if (req[reqType].vote) {
         wif = shepherd.elections.priv;
       }
 
@@ -223,7 +277,14 @@ module.exports = (shepherd) => {
       shepherd.log('electrum createrawtx =>', true);
 
       ecl.connect();
-      shepherd.listunspent(ecl, changeAddress, network, true, req.query.verify === 'true' ? true : null)
+      shepherd._listunspent(
+        req[reqType].utxo ? req[reqType].utxo : false,
+        ecl,
+        changeAddress,
+        network,
+        true,
+        req[reqType].verify === 'true' || req[reqType].verify === true ? true : null
+      )
       .then((utxoList) => {
         ecl.close();
 
@@ -238,7 +299,8 @@ module.exports = (shepherd) => {
           let utxoVerified = true;
 
           for (let i = 0; i < utxoList.length; i++) {
-            if (network === 'komodo') {
+            if (network === 'komodo' ||
+                network.toLowerCase() === 'kmd') {
               utxoListFormatted.push({
                 txid: utxoList[i].txid,
                 vout: utxoList[i].vout,
@@ -279,7 +341,11 @@ module.exports = (shepherd) => {
           // default coin selection algo blackjack with fallback to accumulative
           // make a first run, calc approx tx fee
           // if ins and outs are empty reduce max spend by txfee
-          const firstRun = shepherd.coinSelect(utxoListFormatted, targets, btcFee ? btcFee : 0);
+          const firstRun = coinSelect(
+            utxoListFormatted,
+            targets,
+            btcFee ? btcFee : 0
+          );
           let inputs = firstRun.inputs;
           let outputs = firstRun.outputs;
 
@@ -302,7 +368,11 @@ module.exports = (shepherd) => {
             shepherd.log('coinselect adjusted targets =>', true);
             shepherd.log(targets, true);
 
-            const secondRun = shepherd.coinSelect(utxoListFormatted, targets, 0);
+            const secondRun = coinSelect(
+              utxoListFormatted,
+              targets,
+              0
+            );
             inputs = secondRun.inputs;
             outputs = secondRun.outputs;
             fee = fee ? fee : secondRun.fee;
@@ -372,7 +442,7 @@ module.exports = (shepherd) => {
             shepherd.log(`changeto ${changeAddress} amount ${_change} (${_change * 0.00000001})`, true);
 
             // account for KMD interest
-            if (network === 'komodo' &&
+            if ((network === 'komodo' || network.toLowerCase() === 'kmd') &&
                 totalInterest > 0) {
               // account for extra vout
               // const _feeOverhead = outputs.length === 1 ? shepherd.estimateTxSize(0, 1) * feeRate : 0;
@@ -432,137 +502,159 @@ module.exports = (shepherd) => {
 
               let _rawtx;
 
-              if (req.query.unsigned) {
-                _rawtx = shepherd.buildUnsignedTx(
+              if (req[reqType].nosig) {
+                const _rawObj = {
+                  utxoSet: inputs,
+                  change: _change,
+                  changeAdjusted: _change,
+                  totalInterest,
+                  fee,
+                  value,
                   outputAddress,
                   changeAddress,
                   network,
-                  inputs,
-                  _change,
-                  value
-                );
-              } else {
-                if (!req.query.offline) {
-                  if (network === 'btg' ||
-                      network === 'bch') {
-                    _rawtx = shepherd.buildSignedTxForks(
-                      outputAddress,
-                      changeAddress,
-                      wif,
-                      network,
-                      inputs,
-                      _change,
-                      value
-                    );
-                  } else {
-                    _rawtx = shepherd.buildSignedTx(
-                      outputAddress,
-                      changeAddress,
-                      wif,
-                      network,
-                      inputs,
-                      _change,
-                      value,
-                      opreturn
-                    );
-                  }
-                }
-              }
+                  utxoVerified,
+                };
 
-              if (!push ||
-                  push === 'false') {
                 const successObj = {
                   msg: 'success',
-                  result: {
-                    utxoSet: inputs,
-                    change: _change,
-                    changeAdjusted: _change,
-                    totalInterest,
-                    // wif,
-                    fee,
-                    value,
-                    outputAddress,
-                    changeAddress,
-                    network,
-                    rawtx: _rawtx,
-                    utxoVerified,
-                  },
+                  result: _rawObj,
                 };
 
                 res.end(JSON.stringify(successObj));
               } else {
-                const ecl = new shepherd.electrumJSCore(shepherd.electrumServers[network].port, shepherd.electrumServers[network].address, shepherd.electrumServers[network].proto); // tcp or tls
-
-                ecl.connect();
-                ecl.blockchainTransactionBroadcast(_rawtx)
-                .then((txid) => {
-                  ecl.close();
-
-                  const _rawObj = {
-                    utxoSet: inputs,
-                    change: _change,
-                    changeAdjusted: _change,
-                    totalInterest,
-                    fee,
-                    value,
+                if (req[reqType].unsigned) {
+                  _rawtx = shepherd.buildUnsignedTx(
                     outputAddress,
                     changeAddress,
                     network,
-                    rawtx: _rawtx,
-                    txid,
-                    utxoVerified,
-                  };
-
-                  if (txid &&
-                      txid.indexOf('bad-txns-inputs-spent') > -1) {
-                    const successObj = {
-                      msg: 'error',
-                      result: 'Bad transaction inputs spent',
-                      raw: _rawObj,
-                    };
-
-                    res.end(JSON.stringify(successObj));
-                  } else {
-                    if (txid &&
-                        txid.length === 64) {
-                      if (txid.indexOf('bad-txns-in-belowout') > -1) {
-                        const successObj = {
-                          msg: 'error',
-                          result: 'Bad transaction inputs spent',
-                          raw: _rawObj,
-                        };
-
-                        res.end(JSON.stringify(successObj));
-                      } else {
-                        const successObj = {
-                          msg: 'success',
-                          result: _rawObj,
-                        };
-
-                        res.end(JSON.stringify(successObj));
-                      }
+                    inputs,
+                    _change,
+                    value
+                  );
+                } else {
+                  if (!req[reqType].offline) {
+                    if (network === 'btg' ||
+                        network === 'bch') {
+                      _rawtx = shepherd.buildSignedTxForks(
+                        outputAddress,
+                        changeAddress,
+                        wif,
+                        network,
+                        inputs,
+                        _change,
+                        value
+                      );
                     } else {
-                      if (txid &&
-                          txid.indexOf('bad-txns-in-belowout') > -1) {
-                        const successObj = {
-                          msg: 'error',
-                          result: 'Bad transaction inputs spent',
-                          raw: _rawObj,
-                        };
-
-                        res.end(JSON.stringify(successObj));
-                      } else {
-                        const successObj = {
-                          msg: 'error',
-                          result: 'Can\'t broadcast transaction',
-                          raw: _rawObj,
-                        };
-
-                        res.end(JSON.stringify(successObj));
-                      }
+                      _rawtx = shepherd.buildSignedTx(
+                        outputAddress,
+                        changeAddress,
+                        wif,
+                        network,
+                        inputs,
+                        _change,
+                        value,
+                        opreturn
+                      );
                     }
                   }
-                });
+                }
+
+                if (!push ||
+                    push === 'false') {
+                  const successObj = {
+                    msg: 'success',
+                    result: {
+                      utxoSet: inputs,
+                      change: _change,
+                      changeAdjusted: _change,
+                      totalInterest,
+                      // wif,
+                      fee,
+                      value,
+                      outputAddress,
+                      changeAddress,
+                      network,
+                      rawtx: _rawtx,
+                      utxoVerified,
+                    },
+                  };
+
+                  res.end(JSON.stringify(successObj));
+                } else {
+                  const ecl = shepherd.ecl(network);
+
+                  ecl.connect();
+                  ecl.blockchainTransactionBroadcast(_rawtx)
+                  .then((txid) => {
+                    ecl.close();
+
+                    const _rawObj = {
+                      utxoSet: inputs,
+                      change: _change,
+                      changeAdjusted: _change,
+                      totalInterest,
+                      fee,
+                      value,
+                      outputAddress,
+                      changeAddress,
+                      network,
+                      rawtx: _rawtx,
+                      txid,
+                      utxoVerified,
+                    };
+
+                    if (txid &&
+                        txid.indexOf('bad-txns-inputs-spent') > -1) {
+                      const successObj = {
+                        msg: 'error',
+                        result: 'Bad transaction inputs spent',
+                        raw: _rawObj,
+                      };
+
+                      res.end(JSON.stringify(successObj));
+                    } else {
+                      if (txid &&
+                          txid.length === 64) {
+                        if (txid.indexOf('bad-txns-in-belowout') > -1) {
+                          const successObj = {
+                            msg: 'error',
+                            result: 'Bad transaction inputs spent',
+                            raw: _rawObj,
+                          };
+
+                          res.end(JSON.stringify(successObj));
+                        } else {
+                          const successObj = {
+                            msg: 'success',
+                            result: _rawObj,
+                          };
+
+                          res.end(JSON.stringify(successObj));
+                        }
+                      } else {
+                        if (txid &&
+                            txid.indexOf('bad-txns-in-belowout') > -1) {
+                          const successObj = {
+                            msg: 'error',
+                            result: 'Bad transaction inputs spent',
+                            raw: _rawObj,
+                          };
+
+                          res.end(JSON.stringify(successObj));
+                        } else {
+                          const successObj = {
+                            msg: 'error',
+                            result: 'Can\'t broadcast transaction',
+                            raw: _rawObj,
+                          };
+
+                          res.end(JSON.stringify(successObj));
+                        }
+                      }
+                    }
+                  });
+                }
               }
             }
           }
@@ -583,13 +675,13 @@ module.exports = (shepherd) => {
 
       res.end(JSON.stringify(errorObj));
     }
-  });
+  };
 
   shepherd.post('/electrum/pushtx', (req, res, next) => {
     if (shepherd.checkToken(req.body.token)) {
       const rawtx = req.body.rawtx;
       const _network = req.body.network;
-      const ecl = new shepherd.electrumJSCore(shepherd.electrumServers[_network].port, shepherd.electrumServers[_network].address, shepherd.electrumServers[_network].proto); // tcp or tls
+      const ecl = shepherd.ecl(_network);
 
       ecl.connect();
       ecl.blockchainTransactionBroadcast(rawtx)

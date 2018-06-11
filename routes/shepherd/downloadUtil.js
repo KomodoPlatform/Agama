@@ -1,9 +1,12 @@
+const Promise = require('bluebird');
+const fs = require('fs-extra');
+
 module.exports = (shepherd) => {
   /**
    * Promise based download file method
    */
   shepherd.downloadFile = (configuration) => {
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       // Save variable to know progress
       let receivedBytes = 0;
       let totalBytes = 0;
@@ -17,7 +20,7 @@ module.exports = (shepherd) => {
         },
       });
 
-      let out = shepherd.fs.createWriteStream(configuration.localFile);
+      let out = fs.createWriteStream(configuration.localFile);
       req.pipe(out);
 
       req.on('response', (data) => {

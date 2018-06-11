@@ -1,11 +1,14 @@
 // TODO: watchonly spendable switch
 
+const Promise = require('bluebird');
+
 module.exports = (shepherd) => {
   shepherd.listunspent = (ecl, address, network, full, verify) => {
     let _atLeastOneDecodeTxFailed = false;
 
-    if (full) {
-      return new shepherd.Promise((resolve, reject) => {
+    if (full &&
+        !ecl.insight) {
+      return new Promise((resolve, reject) => {
         ecl.connect();
         ecl.blockchainAddressListunspent(address)
         .then((_utxoJSON) => {
@@ -29,31 +32,32 @@ module.exports = (shepherd) => {
                   ecl.close();
                   resolve('no valid utxo');
                 } else {
-                  shepherd.Promise.all(_utxo.map((_utxoItem, index) => {
-                    return new shepherd.Promise((resolve, reject) => {
+                  Promise.all(_utxo.map((_utxoItem, index) => {
+                    return new Promise((resolve, reject) => {
                       shepherd.getTransaction(_utxoItem['tx_hash'], network, ecl)
                       .then((_rawtxJSON) => {
                         shepherd.log('electrum gettransaction ==>', true);
-                        shepherd.log(index + ' | ' + (_rawtxJSON.length - 1), true);
+                        shepherd.log(`${index} | ${(_rawtxJSON.length - 1)}`, true);
                         shepherd.log(_rawtxJSON, true);
 
                         // decode tx
                         const _network = shepherd.getNetworkData(network);
                         const decodedTx = shepherd.electrumJSTxDecoder(_rawtxJSON, network, _network);
 
-                        shepherd.log('decoded tx =>', true);
-                        shepherd.log(decodedTx, true);
+                        // shepherd.log('decoded tx =>', true);
+                        // shepherd.log(decodedTx, true);
 
                         if (!decodedTx) {
                           _atLeastOneDecodeTxFailed = true;
                           resolve('cant decode tx');
                         } else {
-                          if (network === 'komodo') {
+                          if (network === 'komodo' ||
+                              network.toLowerCase() === 'kmd') {
                             let interest = 0;
 
                             if (Number(_utxoItem.value) * 0.00000001 >= 10 &&
                                 decodedTx.format.locktime > 0) {
-                              interest = shepherd.kmdCalcInterest(decodedTx.format.locktime, _utxoItem.value);
+                              interest = shepherd.kmdCalcInterest(decodedTx.format.locktime, _utxoItem.value, _utxoItem.height);
                             }
 
                             let _resolveObj = {
@@ -72,7 +76,11 @@ module.exports = (shepherd) => {
 
                             // merkle root verification against another electrum server
                             if (verify) {
-                              shepherd.verifyMerkleByCoin(shepherd.findCoinName(network), _utxoItem['tx_hash'], _utxoItem.height)
+                              shepherd.verifyMerkleByCoin(
+                                shepherd.findCoinName(network),
+                                _utxoItem['tx_hash'],
+                                _utxoItem.height
+                              )
                               .then((verifyMerkleRes) => {
                                 if (verifyMerkleRes &&
                                     verifyMerkleRes === shepherd.CONNECTION_ERROR_OR_INCOMPLETE_DATA) {
@@ -99,7 +107,11 @@ module.exports = (shepherd) => {
 
                             // merkle root verification against another electrum server
                             if (verify) {
-                              shepherd.verifyMerkleByCoin(shepherd.findCoinName(network), _utxoItem['tx_hash'], _utxoItem.height)
+                              shepherd.verifyMerkleByCoin(
+                                shepherd.findCoinName(network),
+                                _utxoItem['tx_hash'],
+                                _utxoItem.height
+                              )
                               .then((verifyMerkleRes) => {
                                 if (verifyMerkleRes &&
                                     verifyMerkleRes === shepherd.CONNECTION_ERROR_OR_INCOMPLETE_DATA) {
@@ -141,7 +153,7 @@ module.exports = (shepherd) => {
         });
       });
     } else {
-      return new shepherd.Promise((resolve, reject) => {
+      return new Promise((resolve, reject) => {
         ecl.connect();
         ecl.blockchainAddressListunspent(address)
         .then((json) => {
@@ -161,7 +173,8 @@ module.exports = (shepherd) => {
   shepherd.get('/electrum/listunspent', (req, res, next) => {
     if (shepherd.checkToken(req.query.token)) {
       const network = req.query.network || shepherd.findNetworkObj(req.query.coin);
-      const ecl = new shepherd.electrumJSCore(shepherd.electrumServers[network].port, shepherd.electrumServers[network].address, shepherd.electrumServers[network].proto); // tcp or tls
+      const ecl = shepherd.ecl(network);
+      // const ecl = shepherd.electrumServers[network].proto === 'insight' ? shepherd.insightJSCore(shepherd.electrumServers[network]) : new shepherd.electrumJSCore(shepherd.electrumServers[network].port, shepherd.electrumServers[network].address, shepherd.electrumServers[network].proto); // tcp or tls
 
       if (req.query.full &&
           req.query.full === 'true') {

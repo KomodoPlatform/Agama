@@ -1,10 +1,13 @@
+const Promise = require('bluebird');
+const reverse = require('buffer-reverse');
+const crypto = require('crypto');
+const _sha256 = (data) => {
+  return crypto.createHash('sha256').update(data).digest();
+};
+
 module.exports = (shepherd) => {
   // get merkle root
   shepherd.getMerkleRoot = (txid, proof, pos) => {
-    const reverse = require('buffer-reverse');
-    const _sha256 = (data) => {
-      return shepherd.crypto.createHash('sha256').update(data).digest();
-    }
     let hash = txid;
     let serialized;
 
@@ -44,9 +47,10 @@ module.exports = (shepherd) => {
     const _randomServer = randomServer.split(':');
     const _mainServer = mainServer.split(':');
 
-    let ecl = new shepherd.electrumJSCore(_mainServer[1], _mainServer[0], _mainServer[2]); // tcp or tls
+    //let ecl = new shepherd.electrumJSCore(_mainServer[1], _mainServer[0], _mainServer[2]); // tcp or tls
+    let ecl = shepherd.ecl(network, { ip: _mainServer[0], port: _mainServer[1], proto: _mainServer[2] });
 
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       shepherd.log(`main server: ${mainServer}`, true);
       shepherd.log(`verification server: ${randomServer}`, true);
 
@@ -63,7 +67,8 @@ module.exports = (shepherd) => {
           const _res = shepherd.getMerkleRoot(txid, merkleData.merkle, merkleData.pos);
           shepherd.log(_res, true);
 
-          ecl = new shepherd.electrumJSCore(_randomServer[1], _randomServer[0], _mainServer[2]);
+          ecl = shepherd.ecl(network, { ip: _randomServer[0], port: _randomServer[1], proto: _randomServer[2] });
+          // ecl = new shepherd.electrumJSCore(_randomServer[1], _randomServer[0], randomServer[2]);
           ecl.connect();
 
           shepherd.getBlockHeader(height, network, ecl)
@@ -106,12 +111,12 @@ module.exports = (shepherd) => {
     shepherd.log(shepherd.electrumCoins[coin].server, true);
     shepherd.log(shepherd.electrumCoins[coin].serverList, true);
 
-    return new shepherd.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       if (_serverList !== 'none') {
         let _filteredServerList = [];
 
         for (let i = 0; i < _serverList.length; i++) {
-          if (_serverList[i] !== shepherd.electrumCoins[coin].server.ip + ':' + shepherd.electrumCoins[coin].server.port) {
+          if (_serverList[i] !== shepherd.electrumCoins[coin].server.ip + ':' + shepherd.electrumCoins[coin].server.port + ':' + shepherd.electrumCoins[coin].server.proto) {
             _filteredServerList.push(_serverList[i]);
           }
         }
@@ -120,7 +125,7 @@ module.exports = (shepherd) => {
           txid,
           height,
           _filteredServerList,
-          shepherd.electrumCoins[coin].server.ip + ':' + shepherd.electrumCoins[coin].server.port + ':' + shepherd.electrumServers[coin === 'KMD' || coin === 'komodo' ? 'komodo' : coin.toLowerCase()].proto,
+          shepherd.electrumCoins[coin].server.ip + ':' + shepherd.electrumCoins[coin].server.port + ':' + shepherd.electrumCoins[coin.toLowerCase() === 'kmd' || coin === 'komodo' ? 'kmd' : coin].server.proto,
           coin
         )
         .then((proof) => {
@@ -134,7 +139,11 @@ module.exports = (shepherd) => {
 
   shepherd.get('/electrum/merkle/verify', (req, res, next) => {
     if (shepherd.checkToken(req.query.token)) {
-      shepherd.verifyMerkleByCoin(req.query.coin, req.query.txid, req.query.height)
+      const _coin = req.query.coin;
+      const _txid = req.query.txid;
+      const _height = req.query.height;
+
+      shepherd.verifyMerkleByCoin(_coin, _txid, _height)
       .then((verifyMerkleRes) => {
         const successObj = {
           msg: 'success',

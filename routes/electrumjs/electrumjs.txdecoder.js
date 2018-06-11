@@ -1,7 +1,8 @@
 /*
 MIT License
 
-Copyright (c) 2017 Yuki Akiyama, SuperNET
+Copyright (c) 2017 Yuki Akiyama
+Copyright (c) 2017 - 2018 SuperNET
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +24,26 @@ SOFTWARE.
 */
 
 var bitcoin = require('bitcoinjs-lib');
+// zcash fallback
+const Buffer = require('safe-buffer').Buffer;
+const {
+  readSlice,
+  readInt32,
+  readUInt32,
+} = require('tx-decoder/src/buffer-utils');
+const {
+  compose,
+  addProp,
+} = require('tx-decoder/src/compose');
+const {
+  readInputs,
+  readInput,
+  readOutput,
+} = require('tx-decoder/src/tx-decoder');
+const crypto = require('crypto');
+const _sha256 = (data) => {
+  return crypto.createHash('sha256').update(data).digest();
+};
 
 var decodeFormat = function(tx) {
   var result = {
@@ -39,7 +60,7 @@ var decodeInput = function(tx) {
 
   tx.ins.forEach(function(input, n) {
     var vin = {
-      txid: input.hash.reverse().toString('hex'),
+      txid: !input.hash.reverse ? input.hash : input.hash.reverse().toString('hex'),
       n: input.index,
       script: bitcoin.script.toASM(input.script),
       sequence: input.sequence,
@@ -102,7 +123,41 @@ var TxDecoder = module.exports = function(rawtx, network) {
       outputs: decodeOutput(_tx, network),
     };
   } catch (e) {
-    return false;
+    if (network.isZcash) {
+      console.log('z tx decode fallback');
+
+      const buffer = Buffer.from(rawtx, 'hex');
+
+      const decodeTx = buffer => (
+        compose([
+          addProp('version', readInt32),            // 4 bytes
+          addProp('ins', readInputs(readInput)),    // 1-9 bytes (VarInt), Input counter; Variable, Inputs
+          addProp('outs', readInputs(readOutput)),  // 1-9 bytes (VarInt), Output counter; Variable, Outputs
+          addProp('locktime', readUInt32)           // 4 bytes
+        ])({}, buffer)
+      );
+
+      const readHash = buffer => {
+        const [res, bufferLeft] = readSlice(32)(_sha256(_sha256(buffer)))
+        const hash = Buffer.from(res, 'hex').reverse().toString('hex')
+        return [hash, bufferLeft]
+      };
+
+      let decodedtx = decodeTx(buffer);
+      decodedtx[0].getId = () => {
+        return readHash(buffer)[0];
+      };
+
+      return {
+        tx: decodedtx[0],
+        network: network,
+        format: decodeFormat(decodedtx[0]),
+        inputs: !decodedtx[0].ins.length ? [{ txid: '0000000000000000000000000000000000000000000000000000000000000000' }] : decodeInput(decodedtx[0]),
+        outputs: decodeOutput(decodedtx[0], network),
+      };
+    } else {
+      return false;
+    }
   }
 }
 

@@ -1,7 +1,12 @@
 module.exports = (shepherd) => {
   shepherd.get('/electrum/estimatefee', (req, res, next) => {
     if (shepherd.checkToken(req.query.token)) {
-      const ecl = new shepherd.electrumJSCore(shepherd.electrumServers[req.query.network].port, shepherd.electrumServers[req.query.network].address, shepherd.electrumServers[req.query.network].proto); // tcp or tls
+      const ecl = shepherd.ecl(req.query.network);
+      /*const ecl = new shepherd.electrumJSCore(
+        shepherd.electrumServers[req.query.network].port,
+        shepherd.electrumServers[req.query.network].address,
+        shepherd.electrumServers[req.query.network].proto
+      ); // tcp or tls*/
 
       ecl.connect();
       ecl.blockchainEstimatefee(req.query.blocks)
