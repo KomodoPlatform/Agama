@@ -70,6 +70,7 @@ module.exports = (shepherd) => {
         coin === 'PIZZA' ||
         coin === 'VOTE2018' ||
         coin === 'NINJA' ||
+		coin === 'MAGNAX' ||
         coin === 'KOMODO' ||
         coinUC === 'SUPERNET' ||
         coinUC === 'REVS' ||
@@ -98,6 +99,7 @@ module.exports = (shepherd) => {
         coinUC === 'VOTE2018' ||
         coinUC === 'NINJA' ||
         coinUC === 'KMD' ||
+		coinUC === 'MAGNAX' ||
         coinUC === 'KOMODO') {
       return shepherd.electrumJSNetworks.komodo;
     } else {
