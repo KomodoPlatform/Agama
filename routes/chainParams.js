@@ -13,7 +13,7 @@ const chainParams = {
 	},
         PGT: {
 		ac_supply: 10000000,
-		-ac_end: 1,
+		ac_end: 1,
 	DEX: {
 		ac_supply: 999999,
 	},
