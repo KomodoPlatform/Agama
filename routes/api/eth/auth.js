@@ -11,6 +11,7 @@ module.exports = (api) => {
     const mnemonicWallet = api.eth._keys(seed, true);
 
     api.eth.wallet = mnemonicWallet;
+    api.eth.connect = {};
 
     for (let key in api.eth.coins) {
       const network = key.toLowerCase().indexOf('ropsten') > -1 ? 'ropsten' : 'homestead';
