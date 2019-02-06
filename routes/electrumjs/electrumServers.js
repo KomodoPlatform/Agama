@@ -239,6 +239,18 @@ const _electrumServersExtend = {
   sdc: {
     txfee: 10000,
   },
+  koin: {
+    // !estimatefee
+    address: 'electrum1.koinon.com',
+    port: 50001,
+    proto: 'tcp',
+    txfee: 10000,
+    abbr: 'KOIN',
+    serverList: [
+      'dalian.koinon.cloud:50001',
+      'sumba.koinon.cloud:50001'
+    ]
+   },
   // insight
   aby: {
     address: 'http://explorer.artbyte.me/api/',
