@@ -23,9 +23,9 @@ Komodos Desktop Multicoin Wallet
 #### Build & Start EasyDEX-GUI (frontend)
 
 ```shell
-git clone --recursive https://github.com/komodoplatform/agama --branch master --single-branch
+git clone --recursive https://github.com/komodoplatform/agama --branch dev --single-branch
 cd agama/gui/EasyDEX-GUI/react/
-git checkout master && git pull origin master
+git checkout dev && git pull origin dev
 npm update && npm install
 npm run build && npm start
 ```
