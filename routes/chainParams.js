@@ -302,7 +302,6 @@ const chainParams = {
 		ac_supply: 55500000,
 		ac_public: 1,
 		ac_staked: 50,
-		ac_cc: 229,
 		ac_reward: 646400000,
 		ac_blocktime: 120,
 		addnode: [
