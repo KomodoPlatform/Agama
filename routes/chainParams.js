@@ -308,7 +308,7 @@ const chainParams = {
 		ac_cc: 2,
 		ac_ccenable: 229,
 		addnode: [
-			'seed-nodes.komodo.top',
+			'dp.seed.komodo.top',
 		],
 	},
 };
