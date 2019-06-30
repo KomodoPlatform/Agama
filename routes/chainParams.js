@@ -304,7 +304,7 @@ const chainParams = {
 		ac_staked: 50,
 		ac_reward: 646400000,
 		ac_blocktime: 120,
-		ac_cc: 1,
+		ac_cc: 2,
 		ac_ccenable: 229,
 		addnode: [
 			'seed-nodes.komodo.top',
