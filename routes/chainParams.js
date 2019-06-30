@@ -300,6 +300,7 @@ const chainParams = {
 	},
 	DP: {
 		ac_supply: 55500000,
+		ac_sapling: 1,
 		ac_public: 1,
 		ac_staked: 50,
 		ac_reward: 646400000,
